@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum Topic {
+  DATABASE
+  C_PROGRAMMING
+  /// Full Paper 3 style: both SQL and C in one item or mixed papers
+  MIXED
+}
+
+/// How the mock is presented to students (database paper, C paper, or full paper).
+enum MockFocus {
+  DATABASE
+  C_PROGRAMMING
+  MIXED
+}
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  name         String?
+  school       String?
+  passwordHash String
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  uploads          PastPaperUpload[]
+  authoredQuestions Question[]       @relation("QuestionAuthor")
+  cheatSheets      CheatSheet[]
+  conversations    ChatConversation[]
+  mockExamsCreated MockExam[]        @relation("MockExamAuthor")
+  mockAttempts     MockAttempt[]
+}
+
+/// Reference bank for Paper 3. Admins control `publishedToStudents` (for browse/practice if used).
+model Question {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  topic       Topic
+  type        String   @default("short_answer")
+  prompt      String
+  marks       Int      @default(1)
+  modelAnswer String?
+  explanation String?
+  publishedToStudents Boolean @default(false)
+  sourceLabel String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId String? @db.ObjectId
+  author   User?   @relation("QuestionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  mockLinks MockExamQuestion[]
+  mockAnswers MockAttemptAnswer[]
+}
+
+model PastPaperUpload {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  notes     String?
+  rawText   String
+  /// Optional file from UploadThing (PDF/images)
+  fileUrl  String?
+  fileName String?
+  createdAt DateTime @default(now())
+
+  createdById String @db.ObjectId
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+}
+
+model CheatSheet {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  markdown      String
+  emphasisTopic Topic?
+  publishedToStudents Boolean @default(false)
+  /// Generated PDF for preview/download (UploadThing URL or external)
+  pdfUrl       String?
+  pdfFileName  String?
+  createdAt     DateTime @default(now())
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([publishedToStudents])
+}
+
+model MockExam {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  description  String?
+  durationMinutes Int   @default(120)
+  focus        MockFocus @default(MIXED)
+  publishedToStudents Boolean @default(false)
+  /// When true, submitted students can see model answers and examiner-style notes for this mock.
+  markingGuideReleased Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdById String @db.ObjectId
+  createdBy   User   @relation("MockExamAuthor", fields: [createdById], references: [id], onDelete: Cascade)
+
+  items    MockExamQuestion[]
+  attempts MockAttempt[]
+
+  @@index([publishedToStudents])
+}
+
+model MockExamQuestion {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderIndex Int      @default(0)
+
+  mockExamId String   @db.ObjectId
+  mockExam   MockExam @relation(fields: [mockExamId], references: [id], onDelete: Cascade)
+
+  questionId String   @db.ObjectId
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([mockExamId, questionId])
+  @@index([mockExamId])
+}
+
+model MockAttempt {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  totalScore  Int?
+  maxMarks    Int?
+  timedOut    Boolean   @default(false)
+
+  mockExamId String   @db.ObjectId
+  mockExam   MockExam @relation(fields: [mockExamId], references: [id], onDelete: Cascade)
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  answers MockAttemptAnswer[]
+
+  @@index([mockExamId, userId])
+  @@index([userId])
+}
+
+model MockAttemptAnswer {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  answerText String   @default("")
+  aiMarksAwarded Int?
+  aiFeedback     String?
+  gradedAt       DateTime?
+
+  attemptId String      @db.ObjectId
+  attempt   MockAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId String   @db.ObjectId
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+}
+
+model ChatConversation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  role           String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversationId String           @db.ObjectId
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
