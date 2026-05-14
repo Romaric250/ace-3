@@ -66,6 +66,7 @@ export async function POST(req: Request) {
     const completion = await client.chat.completions.create({
       model,
       temperature: 0.35,
+      max_completion_tokens: 8192,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: `${examSystemPreamble}\nYou write JSON only.` },

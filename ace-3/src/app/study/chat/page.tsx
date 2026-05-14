@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Components } from "react-markdown";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 
 type Conversation = { id: string; title: string | null; updatedAt: string };
 type Message = { id: string; role: string; content: string; createdAt: string };
+
+const assistantMarkdownComponents: Components = {
+  table: ({ children }) => (
+    <div className="table-wrap">
+      <table>{children}</table>
+    </div>
+  ),
+};
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[] | null>(null);
@@ -89,7 +100,7 @@ export default function ChatPage() {
                 activeId === c.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
               }`}
             >
-              <div className="font-medium line-clamp-2">{c.title || "Conversation"}</div>
+              <div className="line-clamp-2 font-medium">{c.title || "Conversation"}</div>
               <div className="text-xs text-muted-foreground">{new Date(c.updatedAt).toLocaleString()}</div>
             </button>
           ))}
@@ -104,27 +115,44 @@ export default function ChatPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-3">
-          <div className="flex-1 space-y-3 overflow-y-auto rounded-[var(--radius-md)] border border-border bg-background/40 p-3">
-            {messages.length === 0 && (
-              <p className="text-sm text-muted-foreground">Ask a question to begin. Start a new thread anytime from the left.</p>
-            )}
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`max-w-[95%] rounded-[var(--radius-md)] border px-3 py-2 text-sm leading-relaxed ${
-                  m.role === "assistant"
-                    ? "border-border bg-card text-muted-foreground"
-                    : "ml-auto border-primary/50 bg-primary/10 text-foreground"
-                }`}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{m.role}</p>
-                <p className="mt-1 whitespace-pre-wrap">{m.content}</p>
-              </div>
-            ))}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {messages.length === 0 && (
+                <p className="text-sm text-muted-foreground">Ask a question to begin. Start a new thread anytime from the left.</p>
+              )}
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[min(100%,52rem)] rounded-[var(--radius-md)] border px-4 py-3 shadow-sm ${
+                    m.role === "assistant"
+                      ? "border-border bg-card text-foreground"
+                      : "ml-auto border-primary/45 bg-primary/12 text-foreground"
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {m.role === "assistant" ? "Tutor" : "You"}
+                  </p>
+                  {m.role === "assistant" ? (
+                    <article className="prose-study mt-2 max-w-none text-sm [&_*]:max-w-full">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={assistantMarkdownComponents}>
+                        {m.content}
+                      </ReactMarkdown>
+                    </article>
+                  ) : (
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/95">{m.content}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="space-y-2">
-            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Pose a Paper 3 question…" />
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Pose a Paper 3 question…"
+              className="min-h-[100px]"
+            />
             <div className="flex justify-end gap-2">
               <Button type="button" disabled={busy} onClick={() => void send()}>
                 {busy ? "Sending…" : "Send"}

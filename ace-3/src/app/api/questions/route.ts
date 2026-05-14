@@ -26,7 +26,6 @@ export async function GET(req: Request) {
       type: true,
       prompt: true,
       marks: true,
-      sourceLabel: true,
       createdAt: true,
     },
     take: 200,

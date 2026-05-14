@@ -38,6 +38,8 @@ export async function POST(req: Request) {
     const completion = await client.chat.completions.create({
       model,
       temperature: 0.35,
+      /** Long-form revision PDF body (multi-page detail). */
+      max_completion_tokens: 12_000,
       messages: [
         { role: "system", content: examSystemPreamble },
         { role: "user", content: prompt },
